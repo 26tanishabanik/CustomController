@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"time"
 	"log"
-	//corev1 "k8s.io/api/core/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	//netv1  "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -45,8 +43,6 @@ func (t *TestHandlerDeployment) Init() error {
 
 func (t *TestHandlerDeployment) DeploymentObjectCreated(obj interface{}) {
 	log.Println("Deployment Created")
-	//deploy := obj.(*appsv1.Deployment)
-	//log.Printf("    Name: %s", &deploy.Name)
 	deploy := obj.(*appsv1.Deployment)
 	log.Printf("    ResourceVersion: %s", deploy.ObjectMeta.ResourceVersion)
 	log.Printf("    Name: %s", deploy.Name)
@@ -197,14 +193,32 @@ func (c *controllerDeployment) syncDeployment(ns string, name string, deploy1 *a
 	if err != nil {
 		fmt.Printf("Error in getting deployment from lister: %s\n", err.Error())
 	}
+	_, err = c.clientset.AppsV1().Deployments(ns).Create(context.Background(), &dep, metav1.CreateOptions{})
+	if err != nil{
+		fmt.Printf("Error in creating deployment: %s\n", err.Error())
+	}
+	svc := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:		pod.Name,
+			Namespace:	ns,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: depLabels(dep),
+			Ports: []corev1.ServicePort{
+				{
+					Name: "http",
+					Port: 80,
+				},
+			},
+		},
+	}
+	_, err = c.clientset.CoreV1().Services(ns).Create(context.Background(), &svc, metav1.CreateOptions{})
+	if err != nil{
+		fmt.Printf("Error in creating service: %s\n", err.Error())
+	}
 
 	return nil
 }
-
-
-// func returnReplica(num int32) *int32{
-// 	return &num
-// }
 
 
 func depLabels(dep appsv1.Deployment) map[string]string{
